@@ -1,36 +1,39 @@
-const updateCampaign = require('./facebookApi');
-const sendSms = require('./sendSms');
+const express = require('express');
+const router = express.Router();
+const Stripe = require('stripe');
+const getRawBody = require('raw-body');
 
-// Confirm this runs every time
-console.log('✅ stripeWebhook.js has loaded');
+// Make sure this key matches your environment variable name
+const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
-async function handleStripeEvent(event) {
-  console.log('⚡️ Stripe event received:', event.type); // <-- THIS SHOULD PRINT
+// Endpoint Secret (from Stripe webhook settings — same page where you got your webhook URL)
+const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-  const invoice = event.data.object;
-  const customerId = invoice.customer;
+router.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
 
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret);
+  } catch (err) {
+    console.error('⚠️ Webhook signature verification failed:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  // ✅ Stripe event verified — now handle it
   if (event.type === 'invoice.payment_succeeded') {
-    const campaignId = await getCampaignIdFromCustomer(customerId);
-    const amount = invoice.amount_paid;
-    console.log(`📈 Updating Facebook campaign for customer ${customerId} with $${amount / 100}`);
-    await updateCampaign(campaignId, amount);
-  }
+  const invoice = event.data.object;
 
-  if (event.type === 'invoice.payment_failed') {
-    const phone = await getPhoneNumberFromCustomer(customerId);
-    const invoiceUrl = invoice.hosted_invoice_url;
-    console.log(`📲 Sending SMS to ${phone} for failed payment`);
-    await sendSms(phone, `Your payment failed. Please complete it here: ${invoiceUrl}`);
-  }
+  // Print to logs (for now)
+  console.log('✅ Payment succeeded for customer:', invoice.customer);
+  console.log('💵 Amount paid:', invoice.amount_paid);
+
+  const updateCampaign = require('./facebookApi');
+  await updateCampaign(invoice.amount_paid);
+
+  res.status(200).json({ received: true });
 }
+);
 
-async function getCampaignIdFromCustomer(customerId) {
-  return '123456789012345'; // placeholder
-}
-
-async function getPhoneNumberFromCustomer(customerId) {
-  return process.env.ADMIN_PHONE || '+15555555555';
-}
-
-module.exports = handleStripeEvent;
+module.exports = router;
