@@ -23,18 +23,18 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 
   // ✅ Stripe event verified — now handle it
   if (event.type === 'invoice.payment_succeeded') {
-  const invoice = event.data.object;
+    const invoice = event.data.object;
 
-  // Print to logs (for now)
-  console.log('✅ Payment succeeded for customer:', invoice.customer);
-  console.log('💵 Amount paid:', invoice.amount_paid);
+    // Print to logs (for now)
+    console.log('✅ Payment succeeded for customer:', invoice.customer);
+    console.log('💵 Amount paid:', invoice.amount_paid);
 
-  const updateCampaign = require('./facebookApi');
-  await updateCampaign(invoice.amount_paid);
+    const updateCampaign = require('./facebookApi');
+    await updateCampaign(invoice.amount_paid);
+  }
 
+  // Always respond to Stripe
   res.status(200).json({ received: true });
-} // 
-
-
+}); // <-- this was missing
 
 module.exports = router;
