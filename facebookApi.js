@@ -12,13 +12,20 @@ async function updateCampaign(amount) {
   };
 
   try {
-    const response = await axios.post(url, null, { params: payload });
+    const response = await axios({
+      method: 'POST',
+      url: url,
+      params: payload,
+      timeout: 10000, // 10 seconds to avoid hangs
+    });
+
     console.log(`✅ Updated Facebook campaign ${campaignId} with $${amount / 100} and end time.`);
     console.log('📡 FB API Response:', response.data);
   } catch (err) {
-    console.error('❌ Facebook API Error:', err.response?.data || err.message);
+    console.error('❌ Facebook API Error:', err?.response?.data || err.message);
   }
 }
 
 module.exports = updateCampaign;
+
 
